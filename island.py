@@ -40,9 +40,6 @@ class Island:
     money: float
     marines: int
 
-    def __eq__(a: Island, b:Island):
-        return (a.name == b.name and a.money == b.money and a.marines == b.marines)
-
     @classmethod
     def random(cls):
         return Island(

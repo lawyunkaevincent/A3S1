@@ -1,15 +1,142 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from island import Island
-from data_structures.hash_table import LinearProbeTable
 from data_structures.heap import MaxHeap
 
+class Mode2Navigator:
+    """
+    The data structure used for this class is in-built dictionary and MaxHeap
+    """
+
+    def __init__(self, n_pirates: int) -> None:
+        """
+        Initialise the Mode2 NaviGator Class
+
+        :param args:
+            n_pirates: number of pirates involved in the Davy Back Fight
+        
+        :complexity: O(1)
+
+        :further explanation: 
+            The initialisation method has constant time complexity because it only involve
+            constant time operations which is simple assignment and creation of a dictionary.
+        """
+        self.n_pirates = n_pirates
+        # Create a dictionary to store the island on the sea using the island name as the key
+        self.island_dict: dict[str,Island] = {}
+        
+    def add_islands(self, islands: list[Island]):
+        """
+        Add islands to the seas.
+
+        :param args:
+            islands: a list of Island instances to be added to the sea
+
+        :complexity: O(I) where I is the length of 'islands' list 
+
+        :further explanation:
+            This method simply loop through the 'islands' list and add all the Island instance
+            in the list to the instance variable self.island_dict dictionary. __setitem__ method
+            in python in-built dictionary is assumed to have complexity of O(1), thus the complexity
+            of this method depends simply on the number of island in the parameter arguments 'islands' list.
+        """
+        for island in islands:
+            self.island_dict[island.name] = island
+
+    def simulate_day(self, crew: int) -> list[tuple[Island|None, int]]:
+        """
+        Simulate a day of Davy Back Fight and return a list of tuples, representing
+        the choices made by the first, second, ... captain in order. Each tuple contain the
+        island that was plundered and number of crews that were sent onto the island
+
+        :param args: 
+            crew: Size of the crew for every pirate captain
+        
+        :best case: happens when all the island has mmratio <= 2
+        :worst case: happens when all the island has mmratio > 2
+        """
+        # create a list to store the plundered island and number of crew sent to the island
+        island_crew_l: list[tuple[Island|None, int]] = []
+        crew_available = crew
+        # create a heap to store the score that the pirate will get for each island that have money-marine ratio greater than 2
+        # If money-marine ratio <= 2, no plundering will result in higher score, thus whenever an island have money-marine ratio <= 2, 
+        # it is not stored into the score heap
+        score_heap = MaxHeap(len(self.island_dict))
+
+        # create a list named 'island_score_l' and append all the island and score into the list for heapifying 
+        island_score_l = []
+        # O(N)
+        for island in self.island_dict.values():
+            marine = island.marines
+            money = island.money
+            crew_left = crew_available-marine
+            try:
+                if money/marine > 2:
+                    score = money/marine*min(crew_available,marine)+2*max(0, crew_left)
+                    # compute the sorted key for MaxHeap using HeapKey class, which is an auxiliary class to store information for both
+                    # scores and island name in the key
+                    key = HeapKey(island.name, score)
+                    island_score_l.append(key)   # append in python list take O(1) complexity
+            except ZeroDivisionError:   # handle situation for an island with zero marine left after being looped by one round
+                continue
+           
+        # O(N)
+        # Heapifying the island score list
+        score_heap = score_heap.heapify(island_score_l)
+
+        # O(C*log(N))
+        for _ in range(self.n_pirates):
+            # still have island that can be plundered to make higher score
+            if len(score_heap) != 0:
+                # get the island name and score pair stored in HeapKey class
+                tar_heapkey:HeapKey = score_heap.get_max()  # O(logN)
+                # get the corresponding island name
+                island_name = tar_heapkey.name
+                tar_island: Island = self.island_dict[island_name]
+                marine = tar_island.marines
+                money = tar_island.money
+                crew_left = crew_available-marine   # marine is the crew required to loot the whole island
+                # have enough crew to loot the whole island (other crew wont come back and loot this island since its resources is completely loop)
+                if crew_left >= 0:
+                    updated_island = Island(tar_island.name, 0, 0)
+                    self.island_dict[tar_island.name] = updated_island  # update island state in the island_dict
+                    island_crew_l.append((updated_island, marine))
+                # not enough crew to loot the whole island (the island can still be looted by other crew )
+                else:
+                    money_plundered = crew_available*money/marine
+                    marine_left = marine - crew_available
+                    money_left = money-money_plundered
+                    updated_island = Island(tar_island.name, money_left, marine_left)
+                    island_crew_l.append((updated_island, crew_available))
+                    self.island_dict[island_name] = updated_island
+                    # recompute the updated key and add it into the heap
+                    updated_crew_left = crew_available-marine_left  # compute crew-left if other pirate loot this island again
+                    updated_score = money_left/marine_left*min(crew_available,marine_left)+2*max(0, updated_crew_left)
+                    updated_key = HeapKey(tar_island.name, updated_score)
+                    # reappend the island score pair into the score_heap
+                    score_heap.add(updated_key)     # O(logN)
+
+            # no plundering will make higher score
+            else:
+                island_crew_l.append((None, 0))
+        return island_crew_l
+
+
+
 @dataclass
-class KeyDict:
+class HeapKey:
+    """
+    An auxilliary class that is use to creat sorted key for the MaxHeap. In details, the sorted key created by HeapKey class
+    will carry two information namely the island name and the score obtained if the pirate plunder the corresponding island.
+    Since for Mode2Navigator class, only the name is unique for every island (can simply use money-marine ratio since two island might have the same ratio)
+    , thus the name is used to create the key for instance variable island_dict in the class, 
+    therefore in order to keep track of the island while computing the score obtained after plundering it,
+    this class is created to to store both information. All the method of this class has complexity of O(1).
+    """
     name: str
     score: float
 
-    def __ge__(a: KeyDict, b: KeyDict):
+    def __ge__(a: HeapKey, b: HeapKey):
         """
         Magic method greater than equal
         Compare two KeyStore based on their moneymarine ratio
@@ -18,7 +145,7 @@ class KeyDict:
         """
         return (a.score >= b.score)
     
-    def __gt__(a: KeyDict, b: KeyDict):
+    def __gt__(a: HeapKey, b: HeapKey):
         """
         Magic method greater than
         Compare two KeyStore based on their moneymarine ratio
@@ -27,7 +154,7 @@ class KeyDict:
         """
         return (a.score > b.score)
         
-    def __le__(a: KeyDict, b: KeyDict):
+    def __le__(a: HeapKey, b: HeapKey):
         """
         Magic method less than equal
         Compare two KeyStore based on their moneymarine ratio
@@ -36,115 +163,15 @@ class KeyDict:
         """
         return (a.score <= b.score)
     
-    def __lt__(a: KeyDict, b: KeyDict):
-        """
-        Magic method less than
-        Compare two KeyStore based on their moneymarine ratio
+    # def __lt__(a: HeapKey, b: HeapKey):
+    #     """
+    #     Magic method less than
+    #     Compare two KeyStore based on their moneymarine ratio
 
-        :complexity: O(1), all the operations are of constant time
-        """
-        return (a.score < b.score)
-
-class Mode2Navigator:
-    """
-    Student-TODO: short paragraph as per https://edstem.org/au/courses/12108/lessons/42810/slides/294117
-    """
-
-    def __init__(self, n_pirates: int) -> None:
-        """
-        Initialise the Mode2 NaviGator Class
-        """
-        self.n_pirates = n_pirates
-        # Create a Linear Hash Table to store the island
-        self.island_store: LinearProbeTable[str,Island] = LinearProbeTable()
-
-    def add_islands(self, islands: list[Island]):
-        """
-        Add islands to the seas
-
-        :complexity: O(I) where I is the length of Islands
-        """
-        # add the island in the 'islands' list into the island_store dict
-        for island in islands:
-            self.island_store[island.name] = island
-
-    def simulate_day(self, crew: int) -> list[tuple[Island|None, int]]:
-        """
-        Simulate a day of Davy Back Fight and return a list of tuples, representing
-        the choices made by the first, second, ... captain in order. Each tuple contain the
-        island that was plundered and crew-mates that were sent onto the island
-        """
-        res: list[tuple[Island|None, int]] = []
-        crew_available = crew
-        sorted_key = MaxHeap(len(self.island_store))
-
-        # O(Nlog(N))
-        for island in self.island_store.values():
-            marine = island.marines
-            money = island.money
-            crew_left = crew_available-marine
-            try:
-                key_immediate = money/marine*min(crew_available,marine)+2*max(0, crew_left)
-            except ZeroDivisionError:   # handle situation for an island with zero marine left
-                key_immediate = 2*max(0, crew_left)
-            key = KeyDict(island.name, key_immediate)
-            sorted_key.add(key)
-
-        # O(C*log(N))
-        for _ in range(self.n_pirates):
-            # still have island that contains money
-            if len(sorted_key) != 0:
-                tar_key_immediate:KeyDict = sorted_key.get_max()
-                tar_key = tar_key_immediate.name
-                tar_island: Island = self.island_store[tar_key]
-                marine = tar_island.marines
-                money = tar_island.money
-                mm_ratio = money/marine
-                # no looting will have higher score
-                if mm_ratio < 2:
-                    res.append((None, 0))
-                # looting to get higher score
-                else:
-                    crew_left = crew_available-marine   # marine is the crew required to loot the whole island
-                    # have enough crew to loot the whole island (other crew wont come back and loot this island since its resources is completely loop)
-                    if crew_left >= 0:
-                        score = 2*crew_left + money
-                        updated_island = Island(tar_island.name, 0, 0)
-                        self.island_store[tar_island.name] = updated_island
-                        res.append((updated_island, marine))
-                        continue
-                    # not enough crew to loot the whole island
-                    else:
-                        score = crew_available*money/marine
-                        marine_left = marine - crew_available
-                        money_left = money-score
-                        updated_crew_left = crew_available-marine_left
-                        updated_island = Island(tar_island.name, money_left, marine_left)
-                        res.append((updated_island, crew_available))
-                        self.island_store[tar_key] = updated_island
-                        updated_key_immediate = money_left/marine_left*min(crew_available,marine_left)+2*max(0, updated_crew_left)
-                        updated_key = KeyDict(tar_island.name, updated_key_immediate)
-                        sorted_key.add(updated_key)
-
-            # all the island is robbed
-            else:
-                res.append((None, 0))
-        return res
-
+    #     :complexity: O(1), all the operations are of constant time
+    #     """
+    #     return (a.score < b.score)
     
-
-    def update_island(self, island: Island, new_money: float, new_marines: int) -> None:
-        """
-        Student-TODO: Best/Worst Case
-        """
-        old_key = island.money/island.marines
-        old_name = island.name
-        updated_island:Island = Island(old_name, new_money, new_marines)
-        updated_key = new_money/new_marines
-        del self.island_store[old_key]
-        self.island_store[updated_key] = updated_island
-
-
 if __name__ == "__main__":
     a = Island("A", 400, 100)
     b = Island("B", 300, 150)
@@ -154,10 +181,10 @@ if __name__ == "__main__":
     islands: list = [a, b, c, d, e]
     nav = Mode2Navigator(8)
     nav.add_islands(islands)
-    print(nav.island_store)
+    print(nav.island_dict)
     results = nav.simulate_day(100)
     print(results)
-    print(nav.island_store)
+    print(nav.island_dict)
 
     expected_scores = [400, 370, 300, 290, 200, 200, 200, 200]
     cur_marines = {
