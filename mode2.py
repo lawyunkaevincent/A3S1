@@ -52,25 +52,33 @@ class Mode2Navigator:
 
     def __init__(self, n_pirates: int) -> None:
         """
-        Student-TODO: Best/Worst Case
+        Initialise the Mode2 NaviGator Class
         """
         self.n_pirates = n_pirates
+        # Create a Linear Hash Table to store the island
         self.island_store: LinearProbeTable[str,Island] = LinearProbeTable()
 
     def add_islands(self, islands: list[Island]):
         """
-        Student-TODO: Best/Worst Case
+        Add islands to the seas
+
+        :complexity: O(I) where I is the length of Islands
         """
+        # add the island in the 'islands' list into the island_store dict
         for island in islands:
             self.island_store[island.name] = island
 
     def simulate_day(self, crew: int) -> list[tuple[Island|None, int]]:
         """
-        Student-TODO: Best/Worst Case
+        Simulate a day of Davy Back Fight and return a list of tuples, representing
+        the choices made by the first, second, ... captain in order. Each tuple contain the
+        island that was plundered and crew-mates that were sent onto the island
         """
         res: list[tuple[Island|None, int]] = []
         crew_available = crew
         sorted_key = MaxHeap(len(self.island_store))
+
+        # O(Nlog(N))
         for island in self.island_store.values():
             marine = island.marines
             money = island.money
@@ -82,6 +90,7 @@ class Mode2Navigator:
             key = KeyDict(island.name, key_immediate)
             sorted_key.add(key)
 
+        # O(C*log(N))
         for _ in range(self.n_pirates):
             # still have island that contains money
             if len(sorted_key) != 0:

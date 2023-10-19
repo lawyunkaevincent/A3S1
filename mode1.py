@@ -2,6 +2,7 @@ from __future__ import annotations
 from island import Island
 from data_structures.hash_table import LinearProbeTable
 from data_structures.heap import MaxHeap
+from data_structures.bst import BinarySearchTree, BSTInOrderIterator
 
 class Mode1Navigator:
     """
@@ -10,64 +11,70 @@ class Mode1Navigator:
 
     def __init__(self, islands: list[Island], crew: int) -> None:
         """
-        Student-TODO: Best/Worst Case
+        Initialise the Nove1Navigator class with initial state of islands and number of crew
+        that is taken on the journey
+
+        :complexity: O(N), where N is the number of island in the argument list named 'islands'
         """
         self.crew_num = crew
         self.num_islands = len(islands)
-        self.islands = islands
-        self.store = LinearProbeTable([self.num_islands])
-        self.store.hash = lambda x: int(x) % self.num_islands
-        for island in islands:
-            money_marine_r = island.money/island.marines
-            self.store[money_marine_r] = island
+        self.islands_l = islands
+         # Create a BST to store all the island with key as the marine-money ratio
+        self.bst_store = BinarySearchTree()
+        # Add all the island into the binary search tree created with key as marine-money ratio of the island
+        # and value is simply the island itself
+        for island in islands:  # O(NlogN) -> depth of BST is bounded by logN
+            marine_money_r = island.marines/island.money
+            self.bst_store[marine_money_r] = island # setitem in BST has complexity O(logN), given the depth is bounded by logN
 
     def select_islands(self) -> list[tuple[Island, int]]:
         """
-        Student-TODO: Best/Worst Case
-        """
-        sorted_ratio = MaxHeap(self.num_islands)
-        for island in self.islands:
-            money_marine_r = island.money/island.marines
-            sorted_ratio.add(money_marine_r)
+        Select the islands that we wish to attak and returning a list containing pairs, with each pair
+        containing the island itself together with the number of crewmates that will be sent to each island
 
+        :complexity: O(NlogN), where N is the number of islands
+
+        :strategy: Create max heap - a for loop of N time - get max money-marine ratio - find respective island - allocate crew members accordingly
+        """
+        # Creat an inorder iterator to get the island according to the marine-money ratio in ascending order
+        bst_iter = BSTInOrderIterator(self.bst_store.root)
+
+        # while sending crewmates, island with lower marine-money ratio will be given priority to maximise the 
+        # money make, thus in order traversal is used to traserve the bst_store in ascending order.
         crew_available = self.crew_num
         res = []
-        for _ in range(self.num_islands):
-            curr_max = sorted_ratio.get_max()
-            tar_island: Island = self.store[curr_max]
-            crew_require = tar_island.marines
+        for collection in bst_iter: # loop through all the node, O(N)
+            tar_island: Island = collection.item   # _getitem_ for LinearProbeTable is expected to have O(1) complexity
+            crew_require = tar_island.marines   # compute the crew required to get all the money on the island
+            # has enough crewmates to get all the money on the island 
             if crew_available > crew_require:
-                res.append((tar_island, crew_require))
+                res.append((tar_island, crew_require))  # append method of a list has O(1) complexity 
                 crew_available -= crew_require
+            # no more crewmates available
             elif crew_available == 0:
                 res.append((tar_island, 0))
+            # crewmates available is not enough to pirates all the money on the island
             elif crew_available <= crew_require:
                 res.append((tar_island, crew_available))
                 crew_available = 0
         return res
     
-    # def select_island_aux(final_list: list[tuple[Island, int]], crew_num: int): list[tuple[Island, int]]
         
     def select_islands_from_crew_numbers(self, crew_numbers: list[int]) -> list[float]:
         """
-        Student-TODO: Best/Worst Case
+        Calculate the most money that can be made with different crew combinations and return a
+        list containing amount of money that could be made with respective crew size given in the crew_numbers list
+
+        :complexity: O(C*N)
         """
-        sorted_ratio = MaxHeap(self.num_islands)
-        for island in self.islands:
-            money_marine_r = island.money/island.marines
-            sorted_ratio.add(money_marine_r)
-        
-        island_key_list = []
-        for _ in range(self.num_islands):
-            island_key_list.append(sorted_ratio.get_max())
-        
         res = []
-        for crew_num in crew_numbers:
+        for crew_num in crew_numbers: # loop through different crew number in argument list 'crew_numbers' 
             max_value = 0
             crew_available = crew_num
-            for i in range(self.num_islands):
-                curr_max = island_key_list[i]
-                tar_island: Island = self.store[curr_max]
+            # Creat an inorder iterator to get the island according to the marine-money ratio in ascending order
+            bst_iter = BSTInOrderIterator(self.bst_store.root)
+            for collection in bst_iter:
+                tar_island: Island = collection.item
                 money = tar_island.money
                 marine = tar_island.marines
                 crew_require = tar_island.marines
@@ -87,20 +94,14 @@ class Mode1Navigator:
         """
         Student-TODO: Best/Worst Case
         """
-        old_key = island.money/island.marines
+        old_key = island.marines/island.money
         old_name = island.name
         updated_island:Island = Island(old_name, new_money, new_marines)
-        updated_key = new_money/new_marines
-        del self.store[old_key]
-        self.store[updated_key] = updated_island
+        updated_key = new_marines/new_money
+        del self.bst_store[old_key]
+        self.bst_store[updated_key] = updated_island
 
 if __name__ == "__main__":
-
-    # a = KeyStore("a", 12)
-    # print(a.name)
-    # f = lambda a: a.name
-    # print(f(a))
-
     a = Island("A", 400, 100)
     b = Island("B", 300, 150)
     c = Island("C", 100, 5)
